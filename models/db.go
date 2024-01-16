@@ -13,6 +13,7 @@ import (
 type EventRepo interface {
 	SaveEvent(ctx context.Context, event *types.Event) error
 	ByBlockHeight(ctx context.Context, blockHeight int) ([]*types.Event, error)
+	List(ctx context.Context, name string) ([]*types.Event, error)
 }
 
 type ExtrinsicRepo interface {
@@ -26,10 +27,18 @@ type BlockRepo interface {
 	ByBlockHeight(ctx context.Context, blockHeight int) (*types.BlockInfo, error)
 }
 
+type EventDetailRepo interface {
+	SaveEventDetail(ctx context.Context, eventDetail *types.EventDetail) error
+	ByBlockHeight(ctx context.Context, blockHeight int) (*types.EventDetail, error)
+	ByID(ctx context.Context, eventID string) (*types.EventDetail, error)
+	List(ctx context.Context) ([]*types.EventDetail, error)
+}
+
 type Repo interface {
 	EventRepo() EventRepo
 	ExtrinsicRepo() ExtrinsicRepo
 	BlockRepo() BlockRepo
+	EventDetailRepo() EventDetailRepo
 }
 
 type mysqlRepo struct {
@@ -48,8 +57,12 @@ func (r *mysqlRepo) BlockRepo() BlockRepo {
 	return newBlockRepo(r.DB)
 }
 
+func (r *mysqlRepo) EventDetailRepo() EventDetailRepo {
+	return newEventDetailRepo(r.DB)
+}
+
 func (r *mysqlRepo) AutoMigrate() error {
-	return r.DB.AutoMigrate(&event{}, &extrinsic{}, &block{})
+	return r.DB.AutoMigrate(&event{}, &extrinsic{}, &block{}, &eventDetail{})
 }
 
 func OpenMysql(connectionString string, debug bool) (Repo, error) {

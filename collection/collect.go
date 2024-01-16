@@ -59,6 +59,8 @@ func (s *Collection) Start(ctx context.Context) {
 	lookBackTicker := time.NewTicker(lookBackInterval)
 	defer ticker.Stop()
 
+	go s.trackEventDetail(ctx)
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -88,6 +90,18 @@ func (s *Collection) Start(ctx context.Context) {
 					log.Println("save event failed:", err)
 					continue
 				}
+
+				if e.Node.Name == types.EventSubspaceFarmerVote {
+					eventDetail, err := s.QueryEventByID(ctx, e.Node.ID)
+					if err != nil {
+						log.Printf("query event detail failed, id: %v, err: %v\n", e.Node.ID, err)
+					} else {
+						if err := s.repo.EventDetailRepo().SaveEventDetail(ctx, eventDetail); err != nil {
+							log.Println("save event detail failed:", err)
+							continue
+						}
+					}
+				}
 			}
 
 			s.startHeight++
@@ -96,6 +110,45 @@ func (s *Collection) Start(ctx context.Context) {
 
 		case <-lookBackTicker.C:
 
+		}
+	}
+}
+
+func (s *Collection) trackEventDetail(ctx context.Context) {
+	eventDetails, err := s.repo.EventDetailRepo().List(ctx)
+	if err != nil {
+		log.Println("list event details failed:", err)
+		return
+	}
+	if len(eventDetails) != 0 {
+		return
+	}
+
+	events, err := s.repo.EventRepo().List(ctx, types.EventSubspaceFarmerVote)
+	if err != nil {
+		log.Println("list events failed:", err)
+		return
+	}
+	var height int64
+	for _, e := range events {
+		if e.Node.Name != types.EventSubspaceFarmerVote {
+			continue
+		}
+
+		eventDetail, err := s.QueryEventByID(ctx, e.Node.ID)
+		if err != nil {
+			log.Printf("query event(%s) detail failed: %v\n", e.Node.ID, err)
+			continue
+		}
+
+		if err := s.repo.EventDetailRepo().SaveEventDetail(ctx, eventDetail); err != nil {
+			log.Println("save event detail failed:", err)
+		}
+		if height < eventDetail.EventArgs.Height {
+			height = eventDetail.EventArgs.Height
+			if height%10 == 0 {
+				log.Printf("query event detail at height: %d\n", height)
+			}
 		}
 	}
 }
@@ -116,6 +169,7 @@ func (s *Collection) queryByBlockDetailHeight(ctx context.Context, blockHeight i
 	if err != nil {
 		return nil, fmt.Errorf("query extrinsic: %w", err)
 	}
+
 	events, err := s.QueryEvent(ctx, blockHeight)
 	if err != nil {
 		return nil, fmt.Errorf("query event: %w", err)
@@ -257,4 +311,47 @@ func (s *Collection) QueryExtrinsic(ctx context.Context, blockID int64) (*types.
 	}
 
 	return &r.Data.ExtrinsicsConnection, nil
+}
+
+func (s *Collection) QueryEventByID(ctx context.Context, eventID string) (*types.EventDetail, error) {
+	reqParams := &types.Req{
+		OperationName: types.OpEventById,
+		Variables: types.Variables{
+			EventId: eventID,
+		},
+		Query: types.EventByIdQuery,
+	}
+
+	data, err := json.Marshal(reqParams)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, s.url, bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("status code: %d", resp.StatusCode)
+	}
+
+	d, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var r types.Resp
+	err = json.Unmarshal(d, &r)
+	if err != nil {
+		return nil, err
+	}
+
+	return &r.Data.EventDetail, nil
 }

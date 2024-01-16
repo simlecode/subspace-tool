@@ -99,3 +99,21 @@ func (er *eventRepo) ByBlockHeight(ctx context.Context, blockHeight int) ([]*typ
 
 	return out, nil
 }
+
+func (er *eventRepo) List(ctx context.Context, name string) ([]*types.Event, error) {
+	var events []*event
+	query := er.WithContext(ctx)
+
+	if len(name) != 0 {
+		query = query.Where("name = ?", name)
+	}
+	if err := query.Find(&events).Error; err != nil {
+		return nil, err
+	}
+	out := make([]*types.Event, 0, len(events))
+	for _, e := range events {
+		out = append(out, toEvent(e))
+	}
+
+	return out, nil
+}
