@@ -95,11 +95,11 @@ func (s *Collection) Start(ctx context.Context) {
 					eventDetail, err := s.QueryEventByID(ctx, e.Node.ID)
 					if err != nil {
 						log.Printf("query event detail failed, id: %v, err: %v\n", e.Node.ID, err)
-					} else {
-						if err := s.repo.EventDetailRepo().SaveEventDetail(ctx, eventDetail); err != nil {
-							log.Println("save event detail failed:", err)
-							continue
-						}
+						continue
+					}
+					if err := s.repo.EventDetailRepo().SaveEventDetail(ctx, eventDetail); err != nil {
+						log.Println("save event detail failed:", err)
+						continue
 					}
 				}
 			}

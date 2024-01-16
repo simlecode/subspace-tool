@@ -12,6 +12,7 @@ type eventDetail struct {
 	Name          string `gorm:"column:name;type:varchar(64)"`
 	BlockHight    int64  `gorm:"column:block_height;index"`
 	PublicKey     string `gorm:"column:public_key;type:varchar(128);index"`
+	ParentHash    string `gorm:"column:parent_hash;type:varchar(64)"`
 	RewardAddress string `gorm:"column:reward_address;type:varchar(128);index"`
 }
 
@@ -21,6 +22,7 @@ func fromEventDetail(src *types.EventDetail) (*eventDetail, error) {
 		Name:          src.Name,
 		BlockHight:    src.EventArgs.Height,
 		PublicKey:     src.EventArgs.PublicKey,
+		ParentHash:    src.EventArgs.ParentHash,
 		RewardAddress: src.EventArgs.RewardAddress,
 	}
 
@@ -31,7 +33,7 @@ func toEventDetail(src *eventDetail) *types.EventDetail {
 	return &types.EventDetail{
 		ID:        src.ID,
 		Name:      src.Name,
-		EventArgs: types.EventArgs{Height: src.BlockHight, PublicKey: src.PublicKey, RewardAddress: src.RewardAddress},
+		EventArgs: types.EventArgs{Height: src.BlockHight, PublicKey: src.PublicKey, RewardAddress: src.RewardAddress, ParentHash: src.ParentHash},
 	}
 }
 
