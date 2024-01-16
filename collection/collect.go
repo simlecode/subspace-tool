@@ -129,27 +129,64 @@ func (s *Collection) trackEventDetail(ctx context.Context) {
 		log.Println("list events failed:", err)
 		return
 	}
-	var height int64
-	for _, e := range events {
-		if e.Node.Name != types.EventSubspaceFarmerVote {
-			continue
-		}
 
-		eventDetail, err := s.QueryEventByID(ctx, e.Node.ID)
-		if err != nil {
-			log.Printf("query event(%s) detail failed: %v\n", e.Node.ID, err)
-			continue
-		}
+	receive := make(chan string, 100)
 
-		if err := s.repo.EventDetailRepo().SaveEventDetail(ctx, eventDetail); err != nil {
-			log.Println("save event detail failed:", err)
-		}
-		if height < eventDetail.EventArgs.Height {
-			height = eventDetail.EventArgs.Height
-			if height%10 == 0 {
-				log.Printf("query event detail at height: %d\n", height)
+	go func() {
+		control := make(chan struct{}, 10)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case id := <-receive:
+				control <- struct{}{}
+
+				eventDetail, err := s.QueryEventByID(ctx, id)
+				if err != nil {
+					log.Println("query event detail failed:", err)
+					receive <- id
+				} else {
+					if err := s.repo.EventDetailRepo().SaveEventDetail(ctx, eventDetail); err != nil {
+						log.Println("save event detail failed:", err)
+						receive <- id
+					}
+					if eventDetail.EventArgs.Height%10 == 0 {
+						log.Println("event height:", eventDetail.EventArgs.Height)
+					}
+				}
+				<-control
 			}
 		}
+	}()
+
+	// var height int64
+	for _, e := range events {
+		// if e.Node.Name != types.EventSubspaceFarmerVote {
+		// 	continue
+		// }
+
+		// i, _ := strconv.ParseInt(e.Node.Block.Height, 10, 64)
+		// if i < 1114210 || i > 1120000 {
+		// 	continue
+		// }
+
+		receive <- e.Node.ID
+
+		// eventDetail, err := s.QueryEventByID(ctx, e.Node.ID)
+		// if err != nil {
+		// 	log.Printf("query event(%s) detail failed: %v\n", e.Node.ID, err)
+		// 	continue
+		// }
+
+		// if err := s.repo.EventDetailRepo().SaveEventDetail(ctx, eventDetail); err != nil {
+		// 	log.Println("save event detail failed:", err)
+		// }
+		// if height < eventDetail.EventArgs.Height {
+		// 	height = eventDetail.EventArgs.Height
+		// 	if height%10 == 0 {
+		// 		log.Printf("query event detail at height: %d\n", height)
+		// 	}
+		// }
 	}
 }
 
