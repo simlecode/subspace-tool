@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/simlecode/subspace-tool/models"
@@ -102,6 +103,34 @@ func (s *Collection) Start(ctx context.Context) {
 						continue
 					}
 				}
+			}
+
+			var wg sync.WaitGroup
+			var err2 error
+			for _, e := range blkInfo.events {
+				if e.Node.Name == types.EventSubspaceFarmerVote {
+					wg.Add(1)
+					id := e.Node.ID
+
+					go func(id string) {
+						defer wg.Done()
+
+						eventDetail, err := s.QueryEventByID(ctx, id)
+						if err != nil {
+							log.Printf("query event detail failed, id: %v, err: %v\n", id, err)
+							err2 = fmt.Errorf("query event detail failed, id: %v, err: %v", id, err)
+						} else {
+							if err := s.repo.EventDetailRepo().SaveEventDetail(ctx, eventDetail); err != nil {
+								log.Println("save event detail failed:", err)
+								err2 = fmt.Errorf("save event detail failed: %s", err)
+							}
+						}
+					}(id)
+				}
+			}
+			wg.Wait()
+			if err2 != nil {
+				continue
 			}
 
 			s.startHeight++
