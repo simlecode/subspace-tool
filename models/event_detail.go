@@ -12,7 +12,7 @@ type eventDetail struct {
 	Name          string `gorm:"column:name;type:varchar(64)"`
 	BlockHight    int64  `gorm:"column:block_height;index"`
 	PublicKey     string `gorm:"column:public_key;type:varchar(128);index"`
-	ParentHash    string `gorm:"column:parent_hash;type:varchar(64)"`
+	ParentHash    string `gorm:"column:parent_hash;type:varchar(128)"`
 	RewardAddress string `gorm:"column:reward_address;type:varchar(128);index"`
 }
 
