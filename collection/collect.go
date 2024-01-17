@@ -91,29 +91,22 @@ func (s *Collection) Start(ctx context.Context) {
 					log.Println("save event failed:", err)
 					continue
 				}
-
-				if e.Node.Name == types.EventSubspaceFarmerVote {
-					eventDetail, err := s.QueryEventByID(ctx, e.Node.ID)
-					if err != nil {
-						log.Printf("query event detail failed, id: %v, err: %v\n", e.Node.ID, err)
-						continue
-					}
-					if err := s.repo.EventDetailRepo().SaveEventDetail(ctx, eventDetail); err != nil {
-						log.Println("save event detail failed:", err)
-						continue
-					}
-				}
 			}
 
 			var wg sync.WaitGroup
 			var err2 error
+			control := make(chan struct{}, 10)
 			for _, e := range blkInfo.events {
 				if e.Node.Name == types.EventSubspaceFarmerVote {
 					wg.Add(1)
 					id := e.Node.ID
+					control <- struct{}{}
 
 					go func(id string) {
-						defer wg.Done()
+						defer func() {
+							wg.Done()
+							<-control
+						}()
 
 						eventDetail, err := s.QueryEventByID(ctx, id)
 						if err != nil {
@@ -129,6 +122,7 @@ func (s *Collection) Start(ctx context.Context) {
 				}
 			}
 			wg.Wait()
+			close(control)
 			if err2 != nil {
 				continue
 			}
