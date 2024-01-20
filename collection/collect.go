@@ -67,6 +67,7 @@ func (s *Collection) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			blockDetailStart := time.Now()
 			blkInfo, err := s.queryByBlockDetailHeight(ctx, s.startHeight)
 			if err != nil {
 				log.Println("query block detail failed:", err)
@@ -75,6 +76,8 @@ func (s *Collection) Start(ctx context.Context) {
 				}
 				continue
 			}
+			blockDetailTook := time.Since(blockDetailStart)
+
 			if err := s.repo.BlockRepo().SaveBlock(ctx, blkInfo.blk); err != nil {
 				log.Println("save block failed: ", err)
 				continue
@@ -93,6 +96,7 @@ func (s *Collection) Start(ctx context.Context) {
 				}
 			}
 
+			eventDetailStart := time.Now()
 			var wg sync.WaitGroup
 			var err2 error
 			control := make(chan struct{}, 10)
@@ -123,13 +127,15 @@ func (s *Collection) Start(ctx context.Context) {
 			}
 			wg.Wait()
 			close(control)
+			eventDetailTook := time.Since(eventDetailStart)
+
 			if err2 != nil {
 				continue
 			}
 
 			s.startHeight++
 
-			log.Printf("current block height: %d\n", s.startHeight)
+			log.Printf("current block height: %d, block took: %v, event detail: %v\n", s.startHeight, blockDetailTook, eventDetailTook)
 
 		case <-lookBackTicker.C:
 
