@@ -24,6 +24,7 @@ const (
 
 type Collection struct {
 	repo                models.Repo
+	client              *http.Client
 	url                 string
 	startHeight         int64
 	lookBackStartHeight int64
@@ -32,6 +33,7 @@ type Collection struct {
 func NewCollect(ctx context.Context, repo models.Repo, url string, startHeight int64, lookBackStartHeight int64) (*Collection, error) {
 	ss := &Collection{
 		repo:                repo,
+		client:              http.DefaultClient,
 		url:                 url,
 		startHeight:         startHeight,
 		lookBackStartHeight: lookBackStartHeight,
@@ -226,19 +228,33 @@ type blkInfo struct {
 }
 
 func (s *Collection) queryByBlockDetailHeight(ctx context.Context, blockHeight int64) (*blkInfo, error) {
-	info, err := s.QueryBlock(ctx, blockHeight)
-	if err != nil {
-		return nil, fmt.Errorf("query block: %w", err)
-	}
+	var wg sync.WaitGroup
+	wg.Add(3)
 
-	extrinsics, err := s.QueryExtrinsic(ctx, blockHeight)
-	if err != nil {
-		return nil, fmt.Errorf("query extrinsic: %w", err)
-	}
+	var info *types.BlockInfo
+	var extrinsics *types.ExtrinsicsConnection
+	var events *types.EventsConnection
+	var blkErr, extrinsicErr, eventErr error
 
-	events, err := s.QueryEvent(ctx, blockHeight)
-	if err != nil {
-		return nil, fmt.Errorf("query event: %w", err)
+	go func() {
+		defer wg.Done()
+		info, blkErr = s.QueryBlock(ctx, blockHeight)
+	}()
+
+	go func() {
+		defer wg.Done()
+		extrinsics, extrinsicErr = s.QueryExtrinsic(ctx, blockHeight)
+	}()
+
+	go func() {
+		defer wg.Done()
+		events, eventErr = s.QueryEvent(ctx, blockHeight)
+	}()
+
+	wg.Wait()
+
+	if blkErr != nil || extrinsicErr != nil || eventErr != nil {
+		return nil, fmt.Errorf("query block: %w, extrinsic: %w, event: %w", blkErr, extrinsicErr, eventErr)
 	}
 
 	return &blkInfo{info, extrinsics.Edges, events.Edges}, nil
@@ -263,7 +279,7 @@ func (s *Collection) QueryBlock(ctx context.Context, blockID int64) (*types.Bloc
 		return nil, err
 	}
 	req.Header.Add("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -311,7 +327,7 @@ func (s *Collection) QueryEvent(ctx context.Context, blockID int64) (*types.Even
 		return nil, err
 	}
 	req.Header.Add("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -355,7 +371,7 @@ func (s *Collection) QueryExtrinsic(ctx context.Context, blockID int64) (*types.
 		return nil, err
 	}
 	req.Header.Add("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -398,7 +414,7 @@ func (s *Collection) QueryEventByID(ctx context.Context, eventID string) (*types
 		return nil, err
 	}
 	req.Header.Add("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
