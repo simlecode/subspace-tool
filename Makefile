@@ -7,6 +7,9 @@ endif
 
 GOFLAGS+=-ldflags="$(ldflags)"
 
+all: collect block-collect
+.PHONY: all
+
 collect:
 	rm -rf ./collect
 	go build $(GOFLAGS) -o collect ./cmd/collect
