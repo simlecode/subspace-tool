@@ -35,3 +35,33 @@ SELECT * FROM blocks WHERE timestamp >= '2024-01-08 00:00:00' && timestamp <= '2
 ```
 SELECT * FROM events WHERE block_height >= 1110135 AND block_height <= 1110335 AND name = 'Rewards.VoteReward';
 ```
+
+## block-collect
+
+通过调用 `subspace` 节点的 `RPC` 接口来获取区块相关信息，然后再把区块信息存储到 MySQL 数据库。
+
+### build
+
+```
+make block-collect
+```
+
+### run
+
+```
+./block-collect --mysql "username:password@localhost:3306/database_name"
+```
+
+### 查询奖励
+
+1. 查询某段时间区块奖励
+
+```
+SELECT count(*) FROM chain_blocks_1 WHERE block_timestamp >= 1705566224 and block_timestamp <= 1705766400;
+```
+
+2. 查询 vote 奖励
+
+```
+SELECT count(*) FROM chain_events_1 WHERE block_num >= 1159716 and block_num <= 1174116 and event_id='FarmerVote';
+```
