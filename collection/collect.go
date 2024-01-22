@@ -74,7 +74,7 @@ func (s *Collection) Start(ctx context.Context) {
 			if err != nil {
 				log.Println("query block detail failed:", err)
 				if strings.Contains(err.Error(), "not found") {
-					ticker.Reset(8 * time.Second)
+					ticker.Reset(2 * time.Second)
 				}
 				continue
 			}
