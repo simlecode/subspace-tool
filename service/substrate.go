@@ -15,6 +15,7 @@ import (
 	"github.com/itering/substrate-api-rpc/rpc"
 	"github.com/itering/substrate-api-rpc/websocket"
 	"github.com/panjf2000/ants/v2"
+	"github.com/simlecode/subspace-tool/models/dao"
 )
 
 // FinalizedWaitingBlockCount
@@ -66,13 +67,19 @@ func (s *SubscribeService) parser(message []byte) (err error) {
 		r := j.ToNewHead()
 		num := util.HexToNumStr(r.Number)
 		log.Println("new head, block number:", num)
-		_ = s.updateChainMetadata(map[string]interface{}{"blockNum": num})
+		_ = s.updateChainMetadata(map[string]interface{}{dao.MetadataBlockNum: num})
 		upgradeHealth(j.Method)
+		go func() {
+			s.newHead <- true
+			onceFinHead.Do(func() {
+				go s.subscribeFetchBlock()
+			})
+		}()
 	case ChainFinalizedHead:
 		r := j.ToNewHead()
 		num := util.HexToNumStr(r.Number)
 		log.Println("finalized head, block number:", num)
-		_ = s.updateChainMetadata(map[string]interface{}{"finalized_blockNum": num})
+		_ = s.updateChainMetadata(map[string]interface{}{dao.MetadataFinalizedBlockNum: num})
 		upgradeHealth(j.Method)
 		go func() {
 			s.newFinHead <- true
@@ -127,6 +134,24 @@ func (s *SubscribeService) subscribeFetchBlock() {
 			for i := startBlock; i <= int(final-FinalizedWaitingBlockCount); i++ {
 				wg.Add(1)
 				_ = p.Invoke(BlockFinalized{BlockNum: i, Finalized: true})
+			}
+			wg.Wait()
+		case <-s.newHead:
+			final, err := s.dao.GetBestBlockNum(context.TODO())
+			if err != nil || final == 0 {
+				time.Sleep(BlockTime * time.Second)
+				continue
+			}
+
+			lastNum, _ := s.dao.GetFillBestBlockNum(ctx)
+			startBlock := lastNum + 1
+			if lastNum == 0 {
+				startBlock = lastNum
+			}
+
+			for i := startBlock; i <= int(final-FinalizedWaitingBlockCount*3); i++ {
+				wg.Add(1)
+				_ = p.Invoke(BlockFinalized{BlockNum: i, Finalized: false})
 			}
 			wg.Wait()
 		case <-s.ctx.Done():
@@ -215,7 +240,9 @@ func (s *Service) FillBlockData(conn websocket.WsConn, blockNum int, finalized b
 	// for Create
 	if err = s.CreateChainBlock(conn, blockHash, &rpcBlock.Block, event, specVersion, finalized); err == nil {
 		_ = s.dao.SaveFillAlreadyBlockNum(context.TODO(), blockNum)
-		setFinalized()
+		if finalized {
+			setFinalized()
+		}
 	} else {
 		log.Printf("Create chain block error %v", err)
 	}

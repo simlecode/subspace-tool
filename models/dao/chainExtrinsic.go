@@ -30,7 +30,7 @@ func (d *Dao) CreateExtrinsic(c context.Context, txn *GormDB, extrinsic *model.C
 		IsSigned:           extrinsic.Signature != "",
 		Fee:                extrinsic.Fee,
 	}
-	query := txn.Create(&ce)
+	query := txn.Save(&ce)
 	if query.RowsAffected > 0 {
 		_ = d.IncrMetadata(c, "count_extrinsic", 1)
 		if ce.IsSigned {

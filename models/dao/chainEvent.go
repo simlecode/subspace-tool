@@ -23,7 +23,7 @@ func (d *Dao) CreateEvent(txn *GormDB, event *model.ChainEvent) error {
 		ExtrinsicIdx:  event.ExtrinsicIdx,
 		ExtrinsicHash: extrinsicHash,
 	}
-	query := txn.Create(&e)
+	query := txn.Save(&e)
 	if query.RowsAffected > 0 {
 		incrCount++
 		_ = d.IncrMetadata(context.TODO(), "count_event", incrCount)

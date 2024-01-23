@@ -79,7 +79,7 @@ func (d *Dao) GetMetadata(c context.Context) (map[string]string, error) {
 	// return
 
 	var kv []models.KeyValue
-	err := d.db.Find(&kv, "`key` like ?", "Metadata%").Error
+	err := d.db.Find(&kv).Error
 	if err != nil {
 		return nil, err
 	}
