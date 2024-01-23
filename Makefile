@@ -14,7 +14,7 @@ collect:
 
 block-collect:
 	rm -rf ./block-collect
-	go build $(GOFLAGS) -o block-collect ./cmd/block-collect
+	go build $(GOFLAGS) -o block-collect ./cmd/blockCollect
 .PHONY: block-collect
 
 lint:
