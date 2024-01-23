@@ -21,3 +21,5 @@ Cargo.lock
 .vscode/
 
 collect
+block-collect
+*.sql

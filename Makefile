@@ -12,6 +12,11 @@ collect:
 	go build $(GOFLAGS) -o collect ./cmd/collect
 .PHONY: collect
 
+block-collect:
+	rm -rf ./block-collect
+	go build $(GOFLAGS) -o block-collect ./cmd/block-collect
+.PHONY: block-collect
+
 lint:
 	golangci-lint run
 
