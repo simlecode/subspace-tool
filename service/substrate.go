@@ -235,6 +235,7 @@ func (s *Service) FillBlockData(conn websocket.WsConn, blockNum int, finalized b
 		block.Logs = util.ToString(rpcBlock.Block.Header.Digest.Logs)
 		block.Event = event
 		_ = s.UpdateBlockData(conn, block, finalized)
+		go GlobalEventDetail.Add(blockNum)
 		return
 	}
 	// for Create
@@ -243,6 +244,7 @@ func (s *Service) FillBlockData(conn websocket.WsConn, blockNum int, finalized b
 		if finalized {
 			setFinalized()
 		}
+		go GlobalEventDetail.Add(blockNum)
 	} else {
 		log.Printf("Create chain block error %v", err)
 	}

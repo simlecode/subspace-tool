@@ -25,6 +25,7 @@ type ExtrinsicRepo interface {
 type BlockRepo interface {
 	SaveBlock(ctx context.Context, block *types.BlockInfo) error
 	ByBlockHeight(ctx context.Context, blockHeight int) (*types.BlockInfo, error)
+	ListBlock(ctx context.Context) ([]*types.BlockInfo, error)
 }
 
 type EventDetailRepo interface {

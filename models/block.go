@@ -98,3 +98,16 @@ func (br *blockRepo) ByBlockHeight(ctx context.Context, blockHeight int) (*types
 
 	return toBlock(&blk), nil
 }
+
+func (br *blockRepo) ListBlock(ctx context.Context) ([]*types.BlockInfo, error) {
+	var blks []block
+	if err := br.WithContext(ctx).Find(&blks).Error; err != nil {
+		return nil, err
+	}
+
+	var out []*types.BlockInfo
+	for _, blk := range blks {
+		out = append(out, toBlock(&blk))
+	}
+	return out, nil
+}

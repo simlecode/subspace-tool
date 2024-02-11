@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	interval         = time.Millisecond * 500
+	interval         = time.Millisecond * 50
 	lookBackInterval = time.Second * 1
 )
 
