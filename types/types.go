@@ -18,7 +18,8 @@ const (
 )
 
 const (
-	EventSubspaceFarmerVote = "Subspace.FarmerVote"
+	EventSubspaceFarmerVote  = "Subspace.FarmerVote"
+	EventSubspaceBlockReward = "Rewards.BlockReward"
 )
 
 type Req struct {
@@ -146,6 +147,7 @@ type EventDetail struct {
 	EventArgs EventArgs `json:"args"`
 	Timestamp string    `json:"timestamp"`
 	TypeName  string    `json:"__typename"`
+	// Block     Block     `json:"block"`
 }
 
 //	"args": {
@@ -159,4 +161,8 @@ type EventArgs struct {
 	PublicKey     string `json:"publicKey"`
 	ParentHash    string `json:"parentHash"`
 	RewardAddress string `json:"rewardAddress"`
+
+	// Rewards.BlockReward
+	BlockAuthor string `json:"blockAuthor"`
+	Reward      string `json:"reward"`
 }

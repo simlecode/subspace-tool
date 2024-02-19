@@ -26,6 +26,7 @@ func newEventDetailWatcher(ctx context.Context, dao dao.IDao) *eventDetailWatche
 }
 
 func (w *eventDetailWatcher) Add(blkNum int) {
+	fmt.Println("add", blkNum)
 	w.receiver <- blkNum
 }
 
@@ -35,8 +36,11 @@ func (w *eventDetailWatcher) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case blkNum := <-w.receiver:
+			fmt.Println("receive", blkNum)
 			if err := w.createEventDetail(blkNum); err != nil {
 				fmt.Printf("create event detail at %d failed: %v \n", blkNum, err)
+			} else {
+				fmt.Println("create event detail success:", blkNum)
 			}
 		}
 	}

@@ -106,6 +106,7 @@ func (s *SubscribeService) subscribeFetchBlock() {
 	p, _ := ants.NewPoolWithFunc(5, func(i interface{}) {
 		blockNum := i.(BlockFinalized)
 		func(bf BlockFinalized) {
+			fmt.Println("fetch block:", bf.BlockNum, "finalized:", bf.Finalized)
 			if err := s.FillBlockData(nil, bf.BlockNum, bf.Finalized); err != nil {
 				log.Printf("call ChainGetBlockHash failed, block num: %v, error %v", bf.BlockNum, err)
 			} else {
@@ -130,6 +131,7 @@ func (s *SubscribeService) subscribeFetchBlock() {
 			if lastNum == 0 {
 				startBlock = lastNum
 			}
+			fmt.Println("startBlock:", startBlock, "final:", final, "lastNum:", lastNum)
 
 			for i := startBlock; i <= int(final-FinalizedWaitingBlockCount); i++ {
 				wg.Add(1)
@@ -137,8 +139,8 @@ func (s *SubscribeService) subscribeFetchBlock() {
 			}
 			wg.Wait()
 		case <-s.newHead:
-			final, err := s.dao.GetBestBlockNum(context.TODO())
-			if err != nil || final == 0 {
+			bestNum, err := s.dao.GetBestBlockNum(ctx)
+			if err != nil || bestNum == 0 {
 				time.Sleep(BlockTime * time.Second)
 				continue
 			}
@@ -148,8 +150,9 @@ func (s *SubscribeService) subscribeFetchBlock() {
 			if lastNum == 0 {
 				startBlock = lastNum
 			}
+			fmt.Println("startBlock:", startBlock, "bestNum:", bestNum, "lastNum:", lastNum)
 
-			for i := startBlock; i <= int(final-FinalizedWaitingBlockCount*3); i++ {
+			for i := startBlock; i <= int(bestNum-10*FinalizedWaitingBlockCount); i++ {
 				wg.Add(1)
 				_ = p.Invoke(BlockFinalized{BlockNum: i, Finalized: false})
 			}
@@ -221,7 +224,9 @@ func (s *Service) FillBlockData(conn websocket.WsConn, blockNum int, finalized b
 
 	var setFinalized = func() {
 		if finalized {
-			_ = s.dao.SaveFillAlreadyFinalizedBlockNum(context.TODO(), blockNum)
+			if err = s.dao.SaveFillAlreadyFinalizedBlockNum(context.TODO(), blockNum); err != nil {
+				fmt.Println("SaveFillAlreadyFinalizedBlockNum error:", err)
+			}
 		}
 	}
 	// refresh finalized info for update
@@ -240,7 +245,10 @@ func (s *Service) FillBlockData(conn websocket.WsConn, blockNum int, finalized b
 	}
 	// for Create
 	if err = s.CreateChainBlock(conn, blockHash, &rpcBlock.Block, event, specVersion, finalized); err == nil {
-		_ = s.dao.SaveFillAlreadyBlockNum(context.TODO(), blockNum)
+		if err = s.dao.SaveFillAlreadyBlockNum(context.TODO(), blockNum); err != nil {
+			fmt.Println("SaveFillAlreadyBlockNum error:", err)
+		}
+
 		if finalized {
 			setFinalized()
 		}
