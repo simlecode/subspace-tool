@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/simlecode/subspace-tool/models"
+	"github.com/simlecode/subspace-tool/ss58"
 	"github.com/simlecode/subspace-tool/types"
 )
 
@@ -75,6 +76,7 @@ func (s *Collection) Start(ctx context.Context) {
 				log.Println("query block detail failed:", err)
 				if strings.Contains(err.Error(), "not found") {
 					ticker.Reset(2 * time.Second)
+					time.Sleep(2 * time.Second)
 				}
 				continue
 			}
@@ -125,6 +127,26 @@ func (s *Collection) Start(ctx context.Context) {
 							}
 						}
 					}(id)
+				}
+				if e.Node.Name == types.EventSubspaceBlockReward {
+					id := e.Node.ID
+					eventDetail, err := s.QueryEventByID(ctx, id)
+					if err != nil {
+						log.Printf("query event detail failed, id: %v, err: %v\n", id, err)
+						err2 = fmt.Errorf("query event detail failed, id: %v, err: %v", id, err)
+					} else {
+						if strings.HasPrefix(blkInfo.blk.Author.ID, "st") {
+							eventDetail.EventArgs.PublicKey = "0x" + ss58.Decode(blkInfo.blk.Author.ID, ss58.SubspaceAddressType)
+						}
+						eventDetail.EventArgs.RewardAddress = eventDetail.EventArgs.BlockAuthor
+						eventDetail.EventArgs.Height, _ = strconv.ParseInt(blkInfo.blk.Height, 10, 64)
+						eventDetail.EventArgs.ParentHash = blkInfo.blk.ParentHash
+
+						if err := s.repo.EventDetailRepo().SaveEventDetail(ctx, eventDetail); err != nil {
+							log.Println("save event detail failed:", err)
+							err2 = fmt.Errorf("save event detail failed: %s", err)
+						}
+					}
 				}
 			}
 			wg.Wait()

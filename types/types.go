@@ -1,7 +1,8 @@
 package types
 
 const (
-	DefURL = "https://squid.gemini-3g.subspace.network/graphql"
+	// DefURL = "https://squid.gemini-3g.subspace.network/graphql"
+	DefURL = "https://squid.gemini-3h.subspace.network/graphql"
 
 	EventQuery     = "query EventsByBlockId($blockId: BigInt!, $first: Int!, $after: String) {\n  eventsConnection(\n    orderBy: indexInBlock_ASC\n    first: $first\n    after: $after\n    where: {block: {height_eq: $blockId}}\n  ) {\n    edges {\n      node {\n        id\n        name\n        phase\n        indexInBlock\n        block {\n          height\n          id\n          __typename\n        }\n        extrinsic {\n          indexInBlock\n          block {\n            height\n            id\n            __typename\n          }\n          __typename\n        }\n        __typename\n      }\n      __typename\n    }\n    totalCount\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n      __typename\n    }\n    __typename\n  }\n}"
 	ExtrinsicQuery = "query ExtrinsicsByBlockId($blockId: BigInt!, $first: Int!, $after: String) {\n  extrinsicsConnection(\n    orderBy: indexInBlock_ASC\n    first: $first\n    after: $after\n    where: {block: {height_eq: $blockId}}\n  ) {\n    edges {\n      node {\n        id\n        hash\n        name\n        success\n        block {\n          height\n          timestamp\n          __typename\n        }\n        indexInBlock\n        __typename\n      }\n      cursor\n      __typename\n    }\n    totalCount\n    pageInfo {\n      hasNextPage\n      endCursor\n      hasPreviousPage\n      startCursor\n      __typename\n    }\n    __typename\n  }\n}"
@@ -17,7 +18,8 @@ const (
 )
 
 const (
-	EventSubspaceFarmerVote = "Subspace.FarmerVote"
+	EventSubspaceFarmerVote  = "Subspace.FarmerVote"
+	EventSubspaceBlockReward = "Rewards.BlockReward"
 )
 
 type Req struct {
@@ -145,6 +147,7 @@ type EventDetail struct {
 	EventArgs EventArgs `json:"args"`
 	Timestamp string    `json:"timestamp"`
 	TypeName  string    `json:"__typename"`
+	// Block     Block     `json:"block"`
 }
 
 //	"args": {
@@ -158,4 +161,8 @@ type EventArgs struct {
 	PublicKey     string `json:"publicKey"`
 	ParentHash    string `json:"parentHash"`
 	RewardAddress string `json:"rewardAddress"`
+
+	// Rewards.BlockReward
+	BlockAuthor string `json:"blockAuthor"`
+	Reward      string `json:"reward"`
 }

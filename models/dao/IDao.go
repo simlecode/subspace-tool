@@ -44,6 +44,7 @@ type IDao interface {
 	CreateLog(txn *GormDB, ce *model.ChainLog) error
 	GetLogsByIndex(index string) *model.ChainLogJson
 	GetLogByBlockNum(blockNum int) []model.ChainLogJson
+	CreateEventDetail(txn *GormDB, eventDetail *EventDetail) error
 	SetMetadata(c context.Context, metadata map[string]interface{}) (err error)
 	IncrMetadata(c context.Context, filed string, incrNum int) (err error)
 	GetMetadata(c context.Context) (ms map[string]string, err error)

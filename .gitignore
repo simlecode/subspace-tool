@@ -23,3 +23,4 @@ Cargo.lock
 collect
 block-collect
 *.sql
+*.log

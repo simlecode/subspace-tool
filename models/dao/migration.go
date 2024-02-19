@@ -29,7 +29,8 @@ func (d *Dao) InternalTables(blockNum int) (models []interface{}) {
 			model.ChainBlock{BlockNum: blockNum},
 			model.ChainEvent{BlockNum: blockNum},
 			model.ChainExtrinsic{BlockNum: blockNum},
-			model.ChainLog{BlockNum: blockNum})
+			model.ChainLog{BlockNum: blockNum},
+			EventDetail{BlockNum: blockNum})
 	}
 	var tablesName []string
 	for _, m := range models {
@@ -50,6 +51,7 @@ func (d *Dao) AddIndex(blockNum int) {
 	eventModel := model.ChainEvent{BlockNum: blockNum}
 	extrinsicModel := model.ChainExtrinsic{BlockNum: blockNum}
 	logModel := model.ChainLog{BlockNum: blockNum}
+	eventDetailModel := EventDetail{BlockNum: blockNum}
 
 	db.Model(blockModel).AddUniqueIndex("hash", "hash")
 	db.Model(blockModel).AddUniqueIndex("block_num", "block_num")
@@ -69,6 +71,11 @@ func (d *Dao) AddIndex(blockNum int) {
 	db.Model(eventModel).AddIndex("event_id", "event_id")
 	db.Model(eventModel).AddIndex("module_id", "module_id")
 	db.Model(eventModel).AddUniqueIndex("event_idx", "event_index", "event_idx")
+
+	db.Model(eventDetailModel).AddIndex("block_num", "block_num")
+	db.Model(eventDetailModel).AddIndex("name", "name")
+	db.Model(eventDetailModel).AddIndex("public_key", "public_key")
+	db.Model(eventDetailModel).AddIndex("reward_address", "reward_address")
 
 	db.Model(logModel).AddUniqueIndex("log_index", "log_index")
 	db.Model(logModel).AddIndex("block_num", "block_num")

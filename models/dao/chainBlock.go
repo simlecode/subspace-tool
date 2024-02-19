@@ -5,10 +5,22 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/itering/subscan/model"
 	"github.com/itering/subscan/util/address"
 	"github.com/simlecode/subspace-tool/models"
+)
+
+var (
+	// RedisMetadataKey      = "metadata"
+	// FillAlreadyBlockNum   = "FillAlreadyBlockNum"
+	// FillFinalizedBlockNum = "FillFinalizedBlockNum"
+
+	// MetadataBlockNum          = "MetadataBlockNum"
+	// MetadataFinalizedBlockNum = "MetadataFinalizedBlockNum"
+	MetadataImplName    = "MetadataImplName"
+	MetadataSpecVersion = "MetadataSpecVersion"
 )
 
 // CreateBlock, mysql db transaction
@@ -33,9 +45,11 @@ func (d *Dao) SaveFillAlreadyBlockNum(c context.Context, blockNum int) error {
 	// }
 	// return nil
 
-	var kv models.KeyValue
+	kv := models.KeyValue{
+		Key: FillAlreadyBlockNum,
+	}
 	err := d.db.First(&kv, "`key` = ?", FillAlreadyBlockNum).Error
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "record not found") {
 		return err
 	}
 	kv.Value = strconv.Itoa(blockNum)
@@ -53,9 +67,11 @@ func (d *Dao) SaveFillAlreadyFinalizedBlockNum(ctx context.Context, blockNum int
 	// 	_, err = conn.Do("SET", FillFinalizedBlockNum, blockNum)
 	// }
 
-	var kv models.KeyValue
+	kv := models.KeyValue{
+		Key: FillFinalizedBlockNum,
+	}
 	err := d.db.First(&kv, "`key` = ?", FillFinalizedBlockNum).Error
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "record not found") {
 		return err
 	}
 	kv.Value = strconv.Itoa(blockNum)

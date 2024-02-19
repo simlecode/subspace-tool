@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"embed"
+	"fmt"
 	"os"
 	"strings"
 
@@ -27,6 +28,7 @@ func New(ctx context.Context, cfg *config.Config) (*Service, error) {
 	s := &Service{dao: d, cfg: cfg}
 	s.initSubRuntimeLatest()
 	pluginRegister(dbStorage)
+	GlobalEventDetail = newEventDetailWatcher(ctx, d)
 
 	return s, nil
 }
@@ -64,12 +66,16 @@ func (s *Service) initSubRuntimeLatest() {
 	}()
 
 	// find db
-	if recent := s.dao.RuntimeVersionRecent(); recent != nil && strings.HasPrefix(recent.RawData, "0x") {
+	recent := s.dao.RuntimeVersionRecent()
+	if recent != nil && strings.HasPrefix(recent.RawData, "0x") {
 		metadata.Latest(&metadata.RuntimeRaw{Spec: recent.SpecVersion, Raw: recent.RawData})
 		return
 	}
+	fmt.Println("recent: ", recent)
 	// find metadata for blockChain
-	if raw := s.regCodecMetadata(); strings.HasPrefix(raw, "0x") {
+	raw := s.regCodecMetadata()
+	fmt.Println("raw: ", raw)
+	if strings.HasPrefix(raw, "0x") {
 		metadata.Latest(&metadata.RuntimeRaw{Spec: 1, Raw: raw})
 		return
 	}
