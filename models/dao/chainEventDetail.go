@@ -11,40 +11,19 @@ type EventDetail struct {
 	ID string `gorm:"column:id;type:varchar(256);primary_key"`
 	// event id
 	Name          string `gorm:"column:name;type:varchar(64);index"`
-	BlockNum      int    `gorm:"column:block_num;index"`
+	BlockHeight   int    `gorm:"column:block_height;index"`
 	PublicKey     string `gorm:"column:public_key;type:varchar(128);index"`
 	ParentHash    string `gorm:"column:parent_hash;type:varchar(128)"`
 	RewardAddress string `gorm:"column:reward_address;type:varchar(128);index"`
 }
 
-// func fromEventDetail(src *types.EventDetail) (*EventDetail, error) {
-// 	out := &EventDetail{
-// 		ID:            src.ID,
-// 		Name:          src.Name,
-// 		BlockNum:      src.EventArgs.Height,
-// 		PublicKey:     src.EventArgs.PublicKey,
-// 		ParentHash:    src.EventArgs.ParentHash,
-// 		RewardAddress: src.EventArgs.RewardAddress,
-// 	}
-
-// 	return out, nil
-// }
-
-// func toEventDetail(src *EventDetail) *types.EventDetail {
-// 	return &types.EventDetail{
-// 		ID:        src.ID,
-// 		Name:      src.Name,
-// 		EventArgs: types.EventArgs{Height: src.BlockNum, PublicKey: src.PublicKey, RewardAddress: src.RewardAddress, ParentHash: src.ParentHash},
-// 	}
-// }
-
 var SplitTableBlockNum = model.SplitTableBlockNum
 
 func (c EventDetail) TableName() string {
-	if c.BlockNum/SplitTableBlockNum == 0 {
+	if c.BlockHeight/SplitTableBlockNum == 0 {
 		return "event_details"
 	}
-	return fmt.Sprintf("event_details_%d", c.BlockNum/SplitTableBlockNum)
+	return fmt.Sprintf("event_details_%d", c.BlockHeight/SplitTableBlockNum)
 }
 
 // var _ EventDetailRepo = (*eventDetailRepo)(nil)
@@ -71,7 +50,7 @@ func (d *Dao) SaveEventDetail(ctx context.Context, eventDetail *EventDetail) err
 
 func (d *Dao) ByBlockHeight(ctx context.Context, blockHeight int) ([]*EventDetail, error) {
 	var eds []*EventDetail
-	if err := d.db.Model(&EventDetail{BlockNum: blockHeight}).Where("block_height = ?", blockHeight).Take(&eds).Error; err != nil {
+	if err := d.db.Model(&EventDetail{BlockHeight: blockHeight}).Where("block_height = ?", blockHeight).Take(&eds).Error; err != nil {
 		return nil, err
 	}
 

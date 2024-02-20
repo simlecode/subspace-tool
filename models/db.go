@@ -35,11 +35,17 @@ type EventDetailRepo interface {
 	List(ctx context.Context) ([]*types.EventDetail, error)
 }
 
+type SpaceRepo interface {
+	SaveSpace(s *Space) error
+	ListSapce() ([]Space, error)
+}
+
 type Repo interface {
 	EventRepo() EventRepo
 	ExtrinsicRepo() ExtrinsicRepo
 	BlockRepo() BlockRepo
 	EventDetailRepo() EventDetailRepo
+	SpaceRepo() SpaceRepo
 }
 
 type mysqlRepo struct {
@@ -62,8 +68,12 @@ func (r *mysqlRepo) EventDetailRepo() EventDetailRepo {
 	return newEventDetailRepo(r.DB)
 }
 
+func (r *mysqlRepo) SpaceRepo() SpaceRepo {
+	return newSpaceRepo(r.DB)
+}
+
 func (r *mysqlRepo) AutoMigrate() error {
-	return r.DB.AutoMigrate(&event{}, &extrinsic{}, &block{}, &eventDetail{})
+	return r.DB.AutoMigrate(&event{}, &extrinsic{}, &block{}, &eventDetail{}, &Space{})
 }
 
 func OpenMysql(connectionString string, debug bool) (Repo, error) {

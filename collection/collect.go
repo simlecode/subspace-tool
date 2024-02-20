@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -29,6 +30,13 @@ type Collection struct {
 	url                 string
 	startHeight         int64
 	lookBackStartHeight int64
+}
+
+func NewSimpleCollect(ctx context.Context, url string) *Collection {
+	return &Collection{
+		client: http.DefaultClient,
+		url:    url,
+	}
 }
 
 func NewCollect(ctx context.Context, repo models.Repo, url string, startHeight int64, lookBackStartHeight int64) (*Collection, error) {
@@ -63,7 +71,8 @@ func (s *Collection) Start(ctx context.Context) {
 	lookBackTicker := time.NewTicker(lookBackInterval)
 	defer ticker.Stop()
 
-	go s.trackEventDetail(ctx)
+	// go s.trackEventDetail(ctx)
+	go s.TrackSpacePledged(ctx, s.repo.SpaceRepo())
 
 	for {
 		select {
@@ -167,15 +176,43 @@ func (s *Collection) Start(ctx context.Context) {
 	}
 }
 
-func (s *Collection) trackEventDetail(ctx context.Context) {
-	eventDetails, err := s.repo.EventDetailRepo().List(ctx)
+func (s *Collection) queryAndSaveEventDeatail(ctx context.Context, eventID string, farmer string, blockHeight int64, parentHash string) error {
+	eventDetail, err := s.QueryEventByID(ctx, eventID)
 	if err != nil {
-		log.Println("list event details failed:", err)
-		return
+		log.Printf("query event detail failed, id: %v, err: %v\n", eventID, err)
+		return fmt.Errorf("query event detail failed, id: %v, err: %v", eventID, err)
 	}
-	if len(eventDetails) != 0 {
-		return
+	if eventDetail.Name == types.EventSubspaceBlockReward {
+		if strings.HasPrefix(farmer, "st") {
+			eventDetail.EventArgs.PublicKey = "0x" + ss58.Decode(farmer, ss58.SubspaceAddressType)
+		}
+		eventDetail.EventArgs.RewardAddress = eventDetail.EventArgs.BlockAuthor
+		eventDetail.EventArgs.Height = blockHeight
+		eventDetail.EventArgs.ParentHash = parentHash
+
+		if err := s.repo.EventDetailRepo().SaveEventDetail(ctx, eventDetail); err != nil {
+			log.Println("save event detail failed:", err)
+			return fmt.Errorf("save event detail failed: %s", err)
+		}
+	} else if eventDetail.Name == types.EventSubspaceFarmerVote {
+		if err := s.repo.EventDetailRepo().SaveEventDetail(ctx, eventDetail); err != nil {
+			log.Println("save event detail failed:", err)
+			return fmt.Errorf("save event detail failed: %s", err)
+		}
 	}
+
+	return nil
+}
+
+func (s *Collection) trackEventDetail(ctx context.Context) {
+	// eventDetails, err := s.repo.EventDetailRepo().List(ctx)
+	// if err != nil {
+	// 	log.Println("list event details failed:", err)
+	// 	return
+	// }
+	// if len(eventDetails) != 0 {
+	// 	return
+	// }
 
 	events, err := s.repo.EventRepo().List(ctx, types.EventSubspaceFarmerVote)
 	if err != nil {
@@ -183,64 +220,155 @@ func (s *Collection) trackEventDetail(ctx context.Context) {
 		return
 	}
 
-	receive := make(chan string, 100)
+	events2, err := s.repo.EventRepo().List(ctx, types.EventSubspaceBlockReward)
+	if err != nil {
+		log.Println("list events failed:", err)
+		return
+	}
+
+	sort.Slice(events2, func(i, j int) bool {
+		return events2[i].Node.Block.Height < events2[j].Node.Block.Height
+	})
+
+	sort.Slice(events, func(i, j int) bool {
+		return events[i].Node.Block.Height < events[j].Node.Block.Height
+	})
+
+	fmt.Println("events:", len(events), len(events2))
+
+	type e struct {
+		EventType   string
+		BlockHeight string
+		ID          string
+	}
+	es := make([]e, 0, len(events)+len(events2))
+	for _, one := range events {
+		es = append(es, e{
+			EventType:   one.Node.Name,
+			ID:          one.Node.ID,
+			BlockHeight: one.Node.Block.Height,
+		})
+	}
+	for _, one := range events2 {
+		es = append(es, e{
+			ID:          one.Node.ID,
+			BlockHeight: one.Node.Block.Height,
+			EventType:   one.Node.Name,
+		})
+	}
+
+	var wg sync.WaitGroup
+	receive := make(chan e, 100)
 
 	go func() {
-		control := make(chan struct{}, 10)
+		control := make(chan struct{}, 50)
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case id := <-receive:
+			case e := <-receive:
 				control <- struct{}{}
 
-				eventDetail, err := s.QueryEventByID(ctx, id)
-				if err != nil {
-					log.Println("query event detail failed:", err)
-					receive <- id
-				} else {
-					if err := s.repo.EventDetailRepo().SaveEventDetail(ctx, eventDetail); err != nil {
-						log.Println("save event detail failed:", err)
-						receive <- id
+				func() {
+					defer func() {
+						wg.Done()
+						<-control
+					}()
+
+					blockHeight, err := strconv.ParseInt(e.BlockHeight, 10, 64)
+					if err != nil {
+						log.Println("parse block height failed:", err)
+						receive <- e
 					}
-					if eventDetail.EventArgs.Height%10 == 0 {
-						log.Println("event height:", eventDetail.EventArgs.Height)
+					if blockHeight%10 == 0 {
+						log.Println("block height:", blockHeight)
 					}
-				}
-				<-control
+					blkInfo, err := s.repo.BlockRepo().ByBlockHeight(ctx, int(blockHeight))
+					if err != nil {
+						log.Println("get block info failed:", err)
+						receive <- e
+					}
+					if err := s.queryAndSaveEventDeatail(ctx, e.ID, blkInfo.Author.ID, blockHeight, blkInfo.ParentHash); err != nil {
+						log.Println("query and save event detail failed:", err)
+						receive <- e
+					}
+				}()
 			}
 		}
 	}()
 
-	// var height int64
-	for _, e := range events {
-		// if e.Node.Name != types.EventSubspaceFarmerVote {
+	for _, e := range es {
+		// if e.EventType != types.EventSubspaceFarmerVote && e.EventType != types.EventSubspaceBlockReward {
 		// 	continue
 		// }
 
-		// i, _ := strconv.ParseInt(e.Node.Block.Height, 10, 64)
-		// if i < 1114210 || i > 1120000 {
-		// 	continue
-		// }
+		if e.EventType != types.EventSubspaceBlockReward {
+			continue
+		}
 
-		receive <- e.Node.ID
+		wg.Add(1)
 
-		// eventDetail, err := s.QueryEventByID(ctx, e.Node.ID)
-		// if err != nil {
-		// 	log.Printf("query event(%s) detail failed: %v\n", e.Node.ID, err)
-		// 	continue
-		// }
+		i, _ := strconv.ParseInt(e.BlockHeight, 10, 64)
+		if i < 230600 {
+			continue
+		}
 
-		// if err := s.repo.EventDetailRepo().SaveEventDetail(ctx, eventDetail); err != nil {
-		// 	log.Println("save event detail failed:", err)
-		// }
-		// if height < eventDetail.EventArgs.Height {
-		// 	height = eventDetail.EventArgs.Height
-		// 	if height%10 == 0 {
-		// 		log.Printf("query event detail at height: %d\n", height)
-		// 	}
-		// }
+		receive <- e
 	}
+
+	wg.Wait()
+}
+
+func (s *Collection) TrackSpacePledged(ctx context.Context, r models.SpaceRepo) error {
+	spaces, err := r.ListSapce()
+	if err != nil {
+		return err
+	}
+	sort.Slice(spaces, func(i, j int) bool {
+		return spaces[i].Timestamp > spaces[j].Timestamp
+	})
+
+	var maxSpace *models.Space
+	if len(spaces) > 0 {
+		maxSpace = &spaces[0]
+	}
+
+	go func() {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+
+		adjustIntervalSecs := int64(2016 * 6)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				var changed bool
+				space, err := s.querySpacePledged(ctx)
+				if err != nil {
+					log.Println("query and save space pledged failed:", err)
+				} else {
+					if maxSpace == nil {
+						changed = true
+					} else if space.Timestamp-maxSpace.Timestamp >= adjustIntervalSecs {
+						changed = true
+					} else if space.Pledged != maxSpace.Pledged {
+						changed = true
+					}
+				}
+				if changed {
+					maxSpace = space
+					if err := r.SaveSpace(maxSpace); err != nil {
+						log.Println("save space pledged failed:", err)
+					} else {
+						log.Println("save space pledged:", maxSpace)
+					}
+				}
+			}
+		}
+	}()
+
+	return nil
 }
 
 type blkInfo struct {
@@ -458,4 +586,61 @@ func (s *Collection) QueryEventByID(ctx context.Context, eventID string) (*types
 	}
 
 	return &r.Data.EventDetail, nil
+}
+
+func (s *Collection) querySpacePledged(ctx context.Context) (*models.Space, error) {
+	reqParams := &types.Req{
+		OperationName: types.OpHomeQuery,
+		Variables: types.Variables{
+			Limit:        10,
+			Offset:       0,
+			AccountTotal: "00",
+		},
+		Query: types.HomeQuery,
+	}
+
+	data, err := json.Marshal(reqParams)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, s.url, bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Content-Type", "application/json")
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("status code: %d", resp.StatusCode)
+	}
+
+	d, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var r types.Resp
+	err = json.Unmarshal(d, &r)
+	if err != nil {
+		return nil, err
+	}
+	space := &models.Space{}
+	if len(r.Data.Blocks) > 0 {
+		space.Pledged, err = strconv.ParseInt(r.Data.Blocks[0].SpacePledged, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		t, err := time.Parse("2006-01-02T15:04:05", strings.Split(r.Data.Blocks[0].Timestamp, ".")[0])
+		if err != nil {
+			return nil, err
+		}
+		space.Timestamp = t.Unix()
+	}
+
+	return space, nil
 }

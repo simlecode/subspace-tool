@@ -10,13 +10,16 @@ import (
 	"github.com/itering/substrate-api-rpc"
 	"github.com/itering/substrate-api-rpc/metadata"
 	"github.com/itering/substrate-api-rpc/websocket"
+	"github.com/simlecode/subspace-tool/collection"
 	"github.com/simlecode/subspace-tool/config"
 	"github.com/simlecode/subspace-tool/models/dao"
+	"github.com/simlecode/subspace-tool/types"
 )
 
 type Service struct {
 	dao dao.IDao
 	cfg *config.Config
+	c   *collection.Collection
 }
 
 func New(ctx context.Context, cfg *config.Config) (*Service, error) {
@@ -25,11 +28,14 @@ func New(ctx context.Context, cfg *config.Config) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	s := &Service{dao: d, cfg: cfg}
+	s := &Service{dao: d, cfg: cfg, c: collection.NewSimpleCollect(ctx, types.DefURL)}
 	s.initSubRuntimeLatest()
 	pluginRegister(dbStorage)
-	GlobalEventDetail = newEventDetailWatcher(ctx, d)
+	GlobalEventDetail = newEventDetailWatcher(ctx, d, s.c)
 
+	if err := s.c.TrackSpacePledged(ctx, s.dao); err != nil {
+		return nil, fmt.Errorf("track space pledged failed: %v", err)
+	}
 	return s, nil
 }
 

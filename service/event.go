@@ -23,6 +23,11 @@ func (s *Service) AddEvent(
 		event.EventIndex = fmt.Sprintf("%d-%d", block.BlockNum, event.ExtrinsicIdx)
 		event.BlockNum = block.BlockNum
 
+		if len(util.ToString(event.Params)) > 1024*10 {
+			fmt.Printf("block %d event %v params too long: %v\n", block.BlockNum, event.EventIndex, len(util.ToString(event.Params)))
+			event.Params = ""
+		}
+
 		if err = s.dao.CreateEvent(txn, &event); err == nil {
 			go s.emitEvent(block, &event, feeMap[event.EventIndex])
 		} else {

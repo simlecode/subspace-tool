@@ -52,6 +52,11 @@ func (s *Service) createExtrinsic(c context.Context,
 			hash[extrinsic.ExtrinsicIndex] = extrinsic.ExtrinsicHash
 		}
 
+		if len(util.ToString(extrinsic.Params)) > 1024*10 {
+			fmt.Printf("block %d extrinsic %d params too long: %v\n", block.BlockNum, index, len(util.ToString(extrinsic.Params)))
+			extrinsic.Params = ""
+		}
+
 		if err = s.dao.CreateExtrinsic(c, txn, &extrinsic); err == nil {
 			go s.emitExtrinsic(block, &extrinsic, eventMap[extrinsic.ExtrinsicIndex])
 		} else {

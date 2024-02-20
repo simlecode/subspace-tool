@@ -111,3 +111,25 @@ func (br *blockRepo) ListBlock(ctx context.Context) ([]*types.BlockInfo, error) 
 	}
 	return out, nil
 }
+
+var _ SpaceRepo = (*spaceRepo)(nil)
+
+type spaceRepo struct {
+	*gorm.DB
+}
+
+func newSpaceRepo(db *gorm.DB) *spaceRepo {
+	return &spaceRepo{DB: db}
+}
+
+func (sp *spaceRepo) SaveSpace(s *Space) error {
+	return sp.DB.Save(s).Error
+}
+
+func (sp *spaceRepo) ListSapce() ([]Space, error) {
+	var ss []Space
+	if err := sp.Find(&ss).Error; err != nil {
+		return nil, err
+	}
+	return ss, nil
+}
