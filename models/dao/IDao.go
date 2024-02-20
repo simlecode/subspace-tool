@@ -5,6 +5,7 @@ import (
 
 	"github.com/itering/subscan/model"
 	"github.com/itering/substrate-api-rpc/metadata"
+	"github.com/simlecode/subspace-tool/models"
 )
 
 type IDao interface {
@@ -55,4 +56,7 @@ type IDao interface {
 	RuntimeVersionList() []model.RuntimeVersion
 	RuntimeVersionRaw(spec int) *metadata.RuntimeRaw
 	RuntimeVersionRecent() *model.RuntimeVersion
+
+	SaveSpace(s *models.Space) error
+	ListSapce() ([]models.Space, error)
 }

@@ -8,6 +8,7 @@ const (
 	ExtrinsicQuery = "query ExtrinsicsByBlockId($blockId: BigInt!, $first: Int!, $after: String) {\n  extrinsicsConnection(\n    orderBy: indexInBlock_ASC\n    first: $first\n    after: $after\n    where: {block: {height_eq: $blockId}}\n  ) {\n    edges {\n      node {\n        id\n        hash\n        name\n        success\n        block {\n          height\n          timestamp\n          __typename\n        }\n        indexInBlock\n        __typename\n      }\n      cursor\n      __typename\n    }\n    totalCount\n    pageInfo {\n      hasNextPage\n      endCursor\n      hasPreviousPage\n      startCursor\n      __typename\n    }\n    __typename\n  }\n}"
 	BlockQuery     = "query BlockById($blockId: BigInt!) {\n  blocks(limit: 10, where: {height_eq: $blockId}) {\n    id\n    height\n    hash\n    stateRoot\n    timestamp\n    extrinsicsRoot\n    specId\n    parentHash\n    extrinsicsCount\n    eventsCount\n    logs(limit: 10, orderBy: block_height_DESC) {\n      block {\n        height\n        timestamp\n        __typename\n      }\n      kind\n      id\n      __typename\n    }\n    author {\n      id\n      __typename\n    }\n    __typename\n  }\n}"
 	EventByIdQuery = "query EventById($eventId: String!) {\n  eventById(id: $eventId) {\n    args\n    id\n    indexInBlock\n    name\n    phase\n    timestamp\n    call {\n      args\n      name\n      success\n      timestamp\n      id\n      __typename\n    }\n    extrinsic {\n      args\n      success\n      tip\n      fee\n      id\n      signer {\n        id\n        __typename\n      }\n      __typename\n    }\n    block {\n      height\n      id\n      timestamp\n      specId\n      hash\n      __typename\n    }\n    __typename\n  }\n}"
+	HomeQuery      = "query HomeQuery($limit: Int!, $offset: Int!, $accountTotal: BigInt!) {\n  blocks(limit: $limit, offset: $offset, orderBy: height_DESC) {\n    id\n    hash\n    height\n    timestamp\n    stateRoot\n    blockchainSize\n    spacePledged\n    extrinsicsCount\n    eventsCount\n    __typename\n  }\n  extrinsics(limit: $limit, offset: $offset, orderBy: timestamp_DESC) {\n    hash\n    id\n    success\n    indexInBlock\n    timestamp\n    block {\n      id\n      height\n      __typename\n    }\n    name\n    __typename\n  }\n  accountsConnection(orderBy: id_ASC, where: {total_gt: $accountTotal}) {\n    totalCount\n    __typename\n  }\n  extrinsicsConnection(orderBy: id_ASC, where: {signature_isNull: false}) {\n    totalCount\n    __typename\n  }\n}"
 )
 
 const (
@@ -15,6 +16,7 @@ const (
 	OpEventsByBlockId     = "EventsByBlockId"
 	OpBlockById           = "BlockById"
 	OpEventById           = "EventById"
+	OpHomeQuery           = "HomeQuery"
 )
 
 const (
@@ -32,6 +34,10 @@ type Variables struct {
 	BlockID int64  `json:"blockId"`
 	First   int    `json:"first"`
 	EventId string `json:"eventId"`
+
+	Limit        int    `json:"limit"`
+	Offset       int    `json:"offset"`
+	AccountTotal string `json:"accountTotal"`
 }
 
 type Resp struct {
@@ -71,6 +77,10 @@ type BlockInfo struct {
 	ExtrinsicsCount int    `json:"extrinsicsCount"`
 	EventsCount     int    `json:"eventsCount"`
 	TypeName        string `json:"__typename"`
+
+	// home query
+	BlockchainSize string `json:"blockchainSize"`
+	SpacePledged   string `json:"spacePledged"`
 }
 
 type Author struct {

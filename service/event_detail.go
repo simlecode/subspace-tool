@@ -4,8 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
+	"github.com/simlecode/subspace-tool/collection"
 	"github.com/simlecode/subspace-tool/models/dao"
+	"github.com/simlecode/subspace-tool/ss58"
+	"github.com/simlecode/subspace-tool/types"
 )
 
 var GlobalEventDetail *eventDetailWatcher
@@ -13,12 +17,14 @@ var GlobalEventDetail *eventDetailWatcher
 type eventDetailWatcher struct {
 	dao      dao.IDao
 	receiver chan int
+	c        *collection.Collection
 }
 
-func newEventDetailWatcher(ctx context.Context, dao dao.IDao) *eventDetailWatcher {
+func newEventDetailWatcher(ctx context.Context, dao dao.IDao, c *collection.Collection) *eventDetailWatcher {
 	w := &eventDetailWatcher{
 		receiver: make(chan int, 20),
 		dao:      dao,
+		c:        c,
 	}
 
 	go w.Start(ctx)
@@ -26,7 +32,6 @@ func newEventDetailWatcher(ctx context.Context, dao dao.IDao) *eventDetailWatche
 }
 
 func (w *eventDetailWatcher) Add(blkNum int) {
-	fmt.Println("add", blkNum)
 	w.receiver <- blkNum
 }
 
@@ -36,9 +41,9 @@ func (w *eventDetailWatcher) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case blkNum := <-w.receiver:
-			fmt.Println("receive", blkNum)
 			if err := w.createEventDetail(blkNum); err != nil {
 				fmt.Printf("create event detail at %d failed: %v \n", blkNum, err)
+				w.Add(blkNum)
 			} else {
 				fmt.Println("create event detail success:", blkNum)
 			}
@@ -55,19 +60,22 @@ func (w *eventDetailWatcher) createEventDetail(blkNum int) error {
 	if events == nil {
 		return fmt.Errorf("events is nil")
 	}
-	// extrinsics := w.dao.GetExtrinsicsByBlockNum(blkNum)
-	// if extrinsics == nil {
-	// 	fmt.Printf("blk %d extrinsics is nil \n", blkNum)
-	// 	continue
-	// }
+
 	var eds []*dao.EventDetail
 	blkRewardEventDetail := &dao.EventDetail{
-		ID:       fmt.Sprintf("%d-1", blkNum),
-		Name:     "BlockReward",
-		BlockNum: blkNum,
-		// PublicKey: ,
-		ParentHash: blk.ParentHash,
-		// RewardAddress: ,
+		ID:          fmt.Sprintf("%d-1", blkNum),
+		Name:        types.EventSubspaceBlockReward,
+		BlockHeight: blkNum,
+		ParentHash:  blk.ParentHash,
+	}
+
+	blkInfo2, err := w.c.QueryBlock(context.Background(), int64(blkNum))
+	if err != nil {
+		return fmt.Errorf("query block failed: %v", err)
+	}
+
+	if strings.HasPrefix(blkInfo2.Author.ID, "st") {
+		blkRewardEventDetail.PublicKey = "0x" + ss58.Decode(blkInfo2.Author.ID, ss58.SubspaceAddressType)
 	}
 
 	start := 3
@@ -81,8 +89,6 @@ func (w *eventDetailWatcher) createEventDetail(blkNum int) error {
 			for _, p := range params {
 				if p.Name == "block_author" {
 					blkRewardEventDetail.RewardAddress = p.Value.(string)
-					// todo: fix
-					blkRewardEventDetail.PublicKey = p.Value.(string)
 					break
 				}
 			}
@@ -95,9 +101,9 @@ func (w *eventDetailWatcher) createEventDetail(blkNum int) error {
 				return fmt.Errorf("unmarshal event(%d) farmer vote params error: %v", idx, err)
 			}
 			ed := dao.EventDetail{
-				ID:       fmt.Sprintf("%d-%d", blkNum, start),
-				Name:     "FarmerVote",
-				BlockNum: blkNum,
+				ID:          fmt.Sprintf("%d-%d", blkNum, start),
+				Name:        types.EventSubspaceFarmerVote,
+				BlockHeight: blkNum,
 			}
 			for _, p := range params {
 				if p.Name == "public_key" {
@@ -116,7 +122,6 @@ func (w *eventDetailWatcher) createEventDetail(blkNum int) error {
 	}
 
 	for _, ed := range eds {
-		fmt.Println("event detail: ", ed)
 		err := w.dao.CreateEventDetail(nil, ed)
 		if err != nil {
 			return err

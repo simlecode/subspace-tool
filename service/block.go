@@ -71,6 +71,18 @@ func (s *Service) CreateChainBlock(conn websocket.WsConn, hash string, block *rp
 		SpecVersion:    spec,
 		Finalized:      finalized,
 	}
+	if len(cb.Logs) > 1024*10 {
+		fmt.Printf("block %d logs too long: %v \n", blockNum, len(cb.Logs))
+		cb.Logs = ""
+	}
+	if len(cb.Event) > 1024*10 {
+		fmt.Printf("block %d event too long: %v \n", blockNum, len(cb.Event))
+		cb.Event = ""
+	}
+	if len(cb.Extrinsics) > 1024*10 {
+		fmt.Printf("block %d extrinsics too long: %v \n", blockNum, len(cb.Extrinsics))
+		cb.Extrinsics = ""
+	}
 
 	extrinsicsCount, blockTimestamp, extrinsicHash, extrinsicFee, err := s.createExtrinsic(c, txn, &cb, block.Extrinsics, decodeExtrinsics, eventMap)
 	if err != nil {
